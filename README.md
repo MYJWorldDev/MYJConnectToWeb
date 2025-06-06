@@ -1,4 +1,4 @@
-#MYJ-COnnect-To-Web
+# MYJ-Connect-To-Web
 
 Code for the browser MYJ Connect-To-Web.
 
