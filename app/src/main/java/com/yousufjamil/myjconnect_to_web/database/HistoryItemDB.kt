@@ -8,5 +8,7 @@ data class HistoryItemDB (
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val title: String,
-    val date: String
+    val url: String,
+    val date: String,
+    val time: String
 )

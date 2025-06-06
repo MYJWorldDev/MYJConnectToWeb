@@ -16,14 +16,20 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.yousufjamil.myjconnect_to_web.data.DataSource
+import com.yousufjamil.myjconnect_to_web.database.DatabaseProvider
+import com.yousufjamil.myjconnect_to_web.database.MYJConnectToWebDB
 import com.yousufjamil.myjconnect_to_web.featurescreens.History
 import com.yousufjamil.myjconnect_to_web.ui.theme.MYJConnectToWebTheme
 
 class MainActivity : ComponentActivity() {
     lateinit var navController: NavHostController
+    lateinit var dbProvider: MYJConnectToWebDB
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        dbProvider = DatabaseProvider.getDatabase(this)
+
         enableEdgeToEdge()
         setContent {
             MYJConnectToWebTheme {
@@ -36,6 +42,7 @@ class MainActivity : ComponentActivity() {
     fun Navigation() {
         navController = rememberNavController()
         DataSource.navController = navController
+        DataSource.dbProvider = dbProvider
 
         NavHost(navController = navController, startDestination = "main") {
             composable("main") {

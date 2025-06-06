@@ -55,6 +55,7 @@ import com.yousufjamil.myjconnect_to_web.accessories.DisplayCustomDialog
 import com.yousufjamil.myjconnect_to_web.accessories.ListItem
 import com.yousufjamil.myjconnect_to_web.accessories.ListItemDataType
 import com.yousufjamil.myjconnect_to_web.data.DataSource
+import com.yousufjamil.myjconnect_to_web.database.HistoryItemDB
 import dev.atrii.composewebkit.ComposeWebView
 import dev.atrii.composewebkit.configureWebChromeClients
 import dev.atrii.composewebkit.configureWebClients
@@ -62,11 +63,16 @@ import dev.atrii.composewebkit.configureWebSettings
 import dev.atrii.composewebkit.rememberComposeWebViewState
 import dev.atrii.composewebkit.rememberWebViewNavigator
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.util.Date
+import java.util.Locale
 
 @Preview(showBackground = true)
 @Composable
 fun MainScreen() {
     var currentUrl by remember { mutableStateOf("") }
+    val coroutineScope = rememberCoroutineScope()
 
     var displayState by remember { mutableStateOf(false) }
     var titleDisplay by remember { mutableStateOf("") }
@@ -76,12 +82,19 @@ fun MainScreen() {
 
     val appNavigator = DataSource.navController
 
+    val initialUrl = if (DataSource.modifyUrl != null) {
+        val tempUrl = DataSource.modifyUrl!!
+        DataSource.modifyUrl = null
+        tempUrl
+    } else {
+        "https://www.google.com"
+    }
     var isRefreshing by rememberSaveable { mutableStateOf(false) }
     val progress = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val navigator = rememberWebViewNavigator()
     val state = rememberComposeWebViewState(
-        url = "https://www.google.com",
+        url = initialUrl,
         onBackPress = {
             if (navigator.canGoBack())
                 navigator.navigateBack()
@@ -110,7 +123,24 @@ fun MainScreen() {
         configureWebClients {
             onPageStarted { webView, url, favicon ->
                 isRefreshing = true
-                currentUrl = url.toString()
+                currentUrl = url ?: "about:blank"
+                val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
+                val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                val currentDate = dateFormat.format(Date())
+                val currentTime = timeFormat.format(Date())
+
+                val title = webView?.title ?: currentUrl
+
+                coroutineScope.launch {
+                    DataSource.dbProvider.historyDao.insertHistory(
+                        HistoryItemDB(
+                            title = title,
+                            url = currentUrl,
+                            date = currentDate,
+                            time = currentTime
+                        )
+                    )
+                }
             }
             onPageFinished { webView, url ->
                 isRefreshing = false
