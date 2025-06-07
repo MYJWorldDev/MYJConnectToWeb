@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,12 +29,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yousufjamil.myjconnect_to_web.accessories.DownloadsDataType
-import com.yousufjamil.myjconnect_to_web.accessories.HistoryDataType
 import com.yousufjamil.myjconnect_to_web.accessories.ListItem
 import com.yousufjamil.myjconnect_to_web.data.DataSource
 import com.yousufjamil.myjconnect_to_web.database.DownloadsItemDB
-import com.yousufjamil.myjconnect_to_web.database.HistoryItemDB
 import kotlinx.coroutines.launch
 
 
@@ -44,26 +40,13 @@ import kotlinx.coroutines.launch
 fun Downloads() {
     var downloadsData by remember { mutableStateOf<List<DownloadsItemDB>>(emptyList()) }
 
-    var downloadsList = remember { mutableListOf<DownloadsDataType>() }
-
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         downloadsData = DataSource.dbProvider.downloadsDao.getAllDownloads()
     }
 
-    for (item in downloadsData) {
-        downloadsList.add(
-            DownloadsDataType(
-                title = item.title,
-                date = item.date,
-                source = item.source,
-                time = item.time
-            )
-        )
-    }
-
-    Column (
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
@@ -99,8 +82,8 @@ fun Downloads() {
         ) {
             var prevDate = ""
 
-            items(downloadsList.size) {
-                val item = downloadsList[downloadsList.size - 1 - it]
+            items(downloadsData.size) {
+                val item = downloadsData[downloadsData.size - 1 - it]
 
                 if (prevDate != item.date) {
                     Text(
@@ -119,17 +102,21 @@ fun Downloads() {
                     trailingIcon = Icons.Default.Clear,
                     onTrailingIconClick = {
                         coroutineScope.launch {
-                            DataSource.dbProvider.downloadsDao.deleteDownload(
-                                DownloadsItemDB(
-                                    title = item.title,
-                                    source = item.source,
-                                    date = item.date,
-                                    time = item.time
-                                )
-                            )
+                            DataSource.dbProvider.downloadsDao.deleteDownload(item)
+                            DataSource.navController.popBackStack()
+                            DataSource.navController.navigate("downloads")
                         }
                     }
                 )
+            }
+
+            if (downloadsData.isEmpty()) {
+                item {
+                    Text(
+                        text = "No downloads yet.",
+                        fontSize = 20.sp
+                    )
+                }
             }
         }
     }

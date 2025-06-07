@@ -14,8 +14,8 @@ android {
         applicationId = "com.yousufjamil.myjconnect_to_web"
         minSdk = 21
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 5
+        versionName = "5.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -62,7 +62,7 @@ dependencies {
     implementation(libs.composewebkit)
     implementation(libs.androidx.navigation.compose)
 
-    implementation("androidx.room:room-runtime:2.7.1")
-    ksp("androidx.room:room-compiler:2.7.1")
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
 
 }

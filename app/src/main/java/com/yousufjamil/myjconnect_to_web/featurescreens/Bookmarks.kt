@@ -29,12 +29,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yousufjamil.myjconnect_to_web.accessories.BookmarksDataType
-import com.yousufjamil.myjconnect_to_web.accessories.HistoryDataType
 import com.yousufjamil.myjconnect_to_web.accessories.ListItem
 import com.yousufjamil.myjconnect_to_web.data.DataSource
 import com.yousufjamil.myjconnect_to_web.database.BookmarksItemDB
-import com.yousufjamil.myjconnect_to_web.database.HistoryItemDB
 import kotlinx.coroutines.launch
 
 
@@ -43,24 +40,13 @@ import kotlinx.coroutines.launch
 fun Bookmarks() {
     var bookmarksData by remember { mutableStateOf<List<BookmarksItemDB>>(emptyList()) }
 
-    var bookmarksList = remember { mutableListOf<BookmarksDataType>() }
-
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         bookmarksData = DataSource.dbProvider.bookmarksDao.getAllBookmarks()
     }
 
-    for (item in bookmarksData) {
-        bookmarksList.add(
-            BookmarksDataType(
-                label = item.label,
-                link = item.link
-            )
-        )
-    }
-
-    Column (
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
@@ -82,7 +68,7 @@ fun Bookmarks() {
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "History",
+                text = "Bookmarks",
                 fontSize = 30.sp
             )
         }
@@ -94,8 +80,8 @@ fun Bookmarks() {
                 .background(Color.White)
                 .padding(20.dp)
         ) {
-            items(bookmarksList.size) {
-                val item = bookmarksList[it]
+            items(bookmarksData.size) {
+                val item = bookmarksData[it]
 
                 ListItem(
                     title = item.label,
@@ -106,15 +92,21 @@ fun Bookmarks() {
                     trailingIcon = Icons.Default.Delete,
                     onTrailingIconClick = {
                         coroutineScope.launch {
-                            DataSource.dbProvider.bookmarksDao.deleteBookmark(
-                                BookmarksItemDB(
-                                    label = item.label,
-                                    link = item.link
-                                )
-                            )
+                            DataSource.dbProvider.bookmarksDao.deleteBookmark(item)
+                            DataSource.navController.popBackStack()
+                            DataSource.navController.navigate("bookmarks")
                         }
                     }
                 )
+            }
+
+            if (bookmarksData.isEmpty()) {
+                item {
+                    Text(
+                        text = "No bookmarks yet.",
+                        fontSize = 20.sp
+                    )
+                }
             }
         }
     }

@@ -30,13 +30,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yousufjamil.myjconnect_to_web.accessories.HistoryDataType
 import com.yousufjamil.myjconnect_to_web.accessories.ListItem
 import com.yousufjamil.myjconnect_to_web.data.DataSource
-import com.yousufjamil.myjconnect_to_web.database.HistoryDao
 import com.yousufjamil.myjconnect_to_web.database.HistoryItemDB
-import com.yousufjamil.myjconnect_to_web.database.MYJConnectToWebDB
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 
@@ -45,23 +41,10 @@ import kotlinx.coroutines.launch
 fun History() {
     var historyData by remember { mutableStateOf<List<HistoryItemDB>>(emptyList()) }
 
-    var historyList = remember { mutableListOf<HistoryDataType>() }
-
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         historyData = DataSource.dbProvider.historyDao.getAllHistory()
-    }
-
-    for (item in historyData) {
-        historyList.add(
-            HistoryDataType(
-                title = item.title,
-                date = item.date,
-                url = item.url,
-                time = item.time
-            )
-        )
     }
 
     Column (
@@ -100,8 +83,8 @@ fun History() {
         ) {
             var prevDate = ""
 
-            items(historyList.size) {
-                val item = historyList[historyList.size - 1 - it]
+            items(historyData.size) {
+                val item = historyData[historyData.size - 1 - it]
 
                 if (prevDate != item.date) {
                     Text(
@@ -123,17 +106,21 @@ fun History() {
                     trailingIcon = Icons.Default.Delete,
                     onTrailingIconClick = {
                         coroutineScope.launch {
-                            DataSource.dbProvider.historyDao.deleteHistory(
-                                HistoryItemDB(
-                                    title = item.title,
-                                    url = item.url,
-                                    date = item.date,
-                                    time = item.time
-                                )
-                            )
+                            DataSource.dbProvider.historyDao.deleteHistory(item)
+                            DataSource.navController.popBackStack()
+                            DataSource.navController.navigate("history")
                         }
                     }
                 )
+            }
+
+            if (historyData.isEmpty()) {
+                item {
+                    Text(
+                        text = "Start browsing to save history.",
+                        fontSize = 20.sp
+                    )
+                }
             }
         }
     }

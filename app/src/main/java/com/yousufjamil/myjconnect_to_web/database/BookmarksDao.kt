@@ -19,4 +19,7 @@ interface BookmarksDao {
 
     @Query("SELECT * FROM bookmarks")
     suspend fun getAllBookmarks(): List<BookmarksItemDB>
+
+    @Query("SELECT COUNT(*) FROM bookmarks WHERE link = :link")
+    suspend fun isBookmarked(link: String): Int
 }

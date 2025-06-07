@@ -7,7 +7,6 @@ import android.app.Activity
 import android.app.DownloadManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -57,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,7 +73,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.core.app.ActivityCompat.startActivityForResult
 import androidx.core.net.toUri
 import com.yousufjamil.myjconnect_to_web.accessories.DisplayAlertDialog
 import com.yousufjamil.myjconnect_to_web.accessories.DisplayCustomDialog
@@ -435,20 +434,38 @@ fun MainScreen() {
                         .background(Color.White)
                         .padding(16.dp)
                 ) {
+                    var bookmarkPopupLabel by remember { mutableStateOf("Bookmark") }
+                    var bookmarkPopupIcon by remember { mutableStateOf(Icons.Default.Star) }
+
+                    LaunchedEffect(currentUrl) {
+                        if (DataSource.dbProvider.bookmarksDao.isBookmarked(currentUrl) == 0) {
+                            bookmarkPopupLabel = "Bookmark"
+                            bookmarkPopupIcon = Icons.Default.Star
+                        } else {
+                            bookmarkPopupLabel = "Bookmarked"
+                            bookmarkPopupIcon = Icons.Default.CheckCircle
+                        }
+                    }
+
                     val menuItemList = listOf(
                         ListItemDataType(
-                            icon = Icons.Default.Star,
-                            title = "Bookmark",
+                            icon = bookmarkPopupIcon,
+                            title = bookmarkPopupLabel,
                             onClick = {
                                 displayMoreMenu = false
 
                                 coroutineScope.launch {
-                                    DataSource.dbProvider.bookmarksDao.insertBookmark(
-                                        BookmarksItemDB(
-                                            label = titleDisplay,
-                                            link = currentUrl
+                                    if (DataSource.dbProvider.bookmarksDao.isBookmarked(currentUrl) == 0) {
+                                        DataSource.dbProvider.bookmarksDao.insertBookmark(
+                                            BookmarksItemDB(
+                                                label = titleDisplay,
+                                                link = currentUrl
+                                            )
                                         )
-                                    )
+
+                                        bookmarkPopupLabel = "Bookmarked"
+                                        bookmarkPopupIcon = Icons.Default.CheckCircle
+                                    }
                                 }
                             }
                         ),
