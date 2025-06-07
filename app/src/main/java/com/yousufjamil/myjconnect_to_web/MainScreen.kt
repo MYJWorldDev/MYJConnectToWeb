@@ -1,6 +1,27 @@
+@file:Suppress("DEPRECATION")
+
 package com.yousufjamil.myjconnect_to_web
 
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.DownloadManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Environment
+import android.util.Patterns
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.URLUtil
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebSettings
+import android.webkit.WebView
+import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
@@ -24,6 +45,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.MoreVert
@@ -47,14 +69,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.core.app.ActivityCompat.startActivityForResult
+import androidx.core.net.toUri
 import com.yousufjamil.myjconnect_to_web.accessories.DisplayAlertDialog
 import com.yousufjamil.myjconnect_to_web.accessories.DisplayCustomDialog
 import com.yousufjamil.myjconnect_to_web.accessories.ListItem
 import com.yousufjamil.myjconnect_to_web.accessories.ListItemDataType
 import com.yousufjamil.myjconnect_to_web.data.DataSource
+import com.yousufjamil.myjconnect_to_web.database.BookmarksItemDB
+import com.yousufjamil.myjconnect_to_web.database.DownloadsItemDB
 import com.yousufjamil.myjconnect_to_web.database.HistoryItemDB
 import dev.atrii.composewebkit.ComposeWebView
 import dev.atrii.composewebkit.configureWebChromeClients
@@ -64,10 +91,10 @@ import dev.atrii.composewebkit.rememberComposeWebViewState
 import dev.atrii.composewebkit.rememberWebViewNavigator
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.time.LocalDate
 import java.util.Date
 import java.util.Locale
 
+@SuppressLint("SetJavaScriptEnabled")
 @Preview(showBackground = true)
 @Composable
 fun MainScreen() {
@@ -81,6 +108,18 @@ fun MainScreen() {
     var displayMoreMenu by remember { mutableStateOf(false) }
 
     val appNavigator = DataSource.navController
+    val context = DataSource.context
+
+    var filePathCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri>? ->
+        filePathCallback?.onReceiveValue(uris?.toTypedArray() ?: arrayOf())
+        filePathCallback = null
+    }
+
+    val activity = LocalView.current.context as Activity
+    val isFullScreen = remember { mutableStateOf(false) }
 
     val initialUrl = if (DataSource.modifyUrl != null) {
         val tempUrl = DataSource.modifyUrl!!
@@ -103,6 +142,8 @@ fun MainScreen() {
         configureWebSettings {
             javaScriptEnabled = true
             cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+            javaScriptCanOpenWindowsAutomatically = true
+
         }
         configureWebChromeClients {
             onProgressChanged { webView, newProgress ->
@@ -123,6 +164,118 @@ fun MainScreen() {
         configureWebClients {
             onPageStarted { webView, url, favicon ->
                 isRefreshing = true
+
+                webView?.settings?.allowFileAccess = true
+                webView?.settings?.allowContentAccess = true
+
+                webView?.setDownloadListener {url, userAgent, contentDisposition, mimetype, contentLength ->
+                    val request = DownloadManager.Request(url.toUri())
+
+                    request.setMimeType(mimetype)
+                    request.addRequestHeader("User-Agent", userAgent)
+                    request.setDescription("Downloading file...")
+                    request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimetype))
+                    request.allowScanningByMediaScanner()
+                    request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimetype))
+
+                    val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                    dm.enqueue(request)
+
+                    Toast.makeText(context, "Downloading File...", Toast.LENGTH_LONG).show()
+
+                    coroutineScope.launch {
+                        val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
+                        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                        val currentDate = dateFormat.format(Date())
+                        val currentTime = timeFormat.format(Date())
+
+                        DataSource.dbProvider.downloadsDao.insertDownload(
+                            DownloadsItemDB(
+                                title = URLUtil.guessFileName(url, contentDisposition, mimetype),
+                                source = url,
+                                date = currentDate,
+                                time = currentTime
+                            )
+                        )
+                    }
+                }
+
+                webView?.webChromeClient = object : WebChromeClient() {
+                    var customView: View? = null
+
+                    override fun onShowFileChooser(
+                        webView: WebView?,
+                        filePathCallback: ValueCallback<Array<Uri>>,
+                        fileChooserParams: FileChooserParams
+                    ): Boolean {
+                        filePickerLauncher.launch("*/*")
+                        return true
+                    }
+
+                    override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                        super.onShowCustomView(view, callback)
+                        isFullScreen.value = true
+                        if (this.customView != null) {
+                            onHideCustomView()
+                            return
+                        }
+                        this.customView = view
+                        (activity.window.decorView as FrameLayout).addView(this.customView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                    }
+
+                    override fun onHideCustomView() {
+                        super.onHideCustomView()
+                        isFullScreen.value = false
+                        (activity.window.decorView as FrameLayout).removeView(this.customView)
+                        this.customView = null
+                    }
+                }
+            }
+
+            onPageFinished { webView, url ->
+                isRefreshing = false
+
+                titleDisplay = webView?.title ?: url ?: "about:blank"
+            }
+
+            shouldOverrideUrlLoading { webView, request ->
+                val url = request?.url.toString()
+
+                println(url)
+
+                if (url.startsWith("upi:") || url.startsWith("intent:")) {
+                    try {
+                        val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                        if (intent.resolveActivity(context.packageManager) != null) {
+                            context.startActivity(intent)
+                        } else {
+                            // Handle no app available
+                            Toast.makeText(context, "No app found to handle this payment", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(context, "Error starting payment", Toast.LENGTH_SHORT).show()
+                    }
+                    true
+                }
+
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+
+                    // Check if there's an app to handle the URL
+                    if (intent.resolveActivity(context.packageManager) != null) {
+                        context.startActivity(intent)
+                        true
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                false
+            }
+
+            doUpdateVisitedHistory { webView, url, isReload ->
                 currentUrl = url ?: "about:blank"
                 val dateFormat = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
                 val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -141,9 +294,6 @@ fun MainScreen() {
                         )
                     )
                 }
-            }
-            onPageFinished { webView, url ->
-                isRefreshing = false
             }
         }
     }
@@ -164,7 +314,7 @@ fun MainScreen() {
             TextField(
                 value = currentUrl,
                 onValueChange = { currentUrl = it },
-                placeholder = { Text("URL") },
+                placeholder = { Text("Search or enter url") },
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
                     .clip(RoundedCornerShape(100.dp)),
@@ -176,8 +326,20 @@ fun MainScreen() {
                     Row {
                         Button(
                             onClick = {
-                                scope.launch {
-                                    navigator.loadUrl(currentUrl)
+                                if (
+                                    Patterns.WEB_URL.matcher(currentUrl).matches() &&
+                                    try {
+                                        val parsed = currentUrl.toUri()
+                                        parsed.scheme != null && parsed.host != null
+                                    } catch (_: Exception) {
+                                        false
+                                    }
+                                ) {
+                                    scope.launch {
+                                        navigator.loadUrl(currentUrl)
+                                    }
+                                } else {
+                                    navigator.loadUrl("https://www.google.com/search?q=${Uri.encode(currentUrl)}")
                                 }
                             },
                             modifier = Modifier
@@ -275,6 +437,22 @@ fun MainScreen() {
                 ) {
                     val menuItemList = listOf(
                         ListItemDataType(
+                            icon = Icons.Default.Star,
+                            title = "Bookmark",
+                            onClick = {
+                                displayMoreMenu = false
+
+                                coroutineScope.launch {
+                                    DataSource.dbProvider.bookmarksDao.insertBookmark(
+                                        BookmarksItemDB(
+                                            label = titleDisplay,
+                                            link = currentUrl
+                                        )
+                                    )
+                                }
+                            }
+                        ),
+                        ListItemDataType(
                             icon = Icons.Default.DateRange,
                             title = "History",
                             onClick = {
@@ -284,11 +462,12 @@ fun MainScreen() {
                             }
                         ),
                         ListItemDataType(
-                            icon = Icons.Default.Star,
+                            icon = Icons.AutoMirrored.Default.List,
                             title = "Bookmarks",
                             onClick = {
                                 displayMoreMenu = false
 
+                                appNavigator.navigate("bookmarks")
                             }
                         ),
                         ListItemDataType(
@@ -297,6 +476,7 @@ fun MainScreen() {
                             onClick = {
                                 displayMoreMenu = false
 
+                                appNavigator.navigate("downloads")
                             }
                         )
                     )

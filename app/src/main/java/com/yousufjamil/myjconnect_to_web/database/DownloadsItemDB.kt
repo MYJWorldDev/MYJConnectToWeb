@@ -9,5 +9,6 @@ data class DownloadsItemDB (
     val id: Int = 0,
     val title: String,
     val source: String,
-    val date: String
+    val date: String,
+    val time: String
 )
