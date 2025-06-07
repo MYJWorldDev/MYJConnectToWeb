@@ -94,8 +94,6 @@ fun Bookmarks() {
                 .background(Color.White)
                 .padding(20.dp)
         ) {
-            var prevDate = ""
-
             items(bookmarksList.size) {
                 val item = bookmarksList[it]
 

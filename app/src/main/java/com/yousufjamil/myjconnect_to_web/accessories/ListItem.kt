@@ -82,7 +82,9 @@ fun ListItem(
                     contentDescription = null,
                     modifier = Modifier
                         .clickable {
-                            onTrailingIconClick?.invoke()
+                            if (onTrailingIconClick != null) {
+                                onTrailingIconClick()
+                            }
                         }
                 )
             }
